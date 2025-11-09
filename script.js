@@ -1,30 +1,9 @@
-/* --- QUIZVERSE ---
- * This file contains all the frontend JavaScript logic for QuizVerse.
- * It handles:
- * 1. API Communication (fetches)
- * 2. Page Navigation (SPA logic)
- * 3. User Authentication (Login/Register/Logout)
- * 4. Teacher Dashboard (Creating/Managing Quizzes)
- * 5. Student Dashboard (Taking Quizzes)
- * 6. Proctoring (window.onblur)
- */
 
-// --- GLOBAL STATE ---
-let currentUser = null; // Holds user info (uid, email, role)
-let currentQuizState = null; // Holds data for the quiz being taken
-let masterTimerInterval = null; // Holds the interval for the quiz timer
-const baseUrl = 'http://127.0.0.1:5000'; // Force HTTP to match the Flask server
+let currentUser = null; 
+let currentQuizState = null; 
+let masterTimerInterval = null;
+const baseUrl = 'http://127.0.0.1:5000';
 
-// --- API HELPER ---
-
-/**
- * A wrapper for the native fetch API to handle API requests.
- * Automatically handles JSON and parses responses.
- * @param {string} url - The API endpoint (e.g., '/api/login')
- * @param {string} method - 'GET', 'POST', 'PUT', 'DELETE'
- * @param {object} [body] - The JSON body for POST/PUT requests
- * @returns {Promise<object>} - The JSON response from the server
- */
 async function api(url, method = 'GET', body = null) {
     const options = {
         method,
@@ -37,79 +16,65 @@ async function api(url, method = 'GET', body = null) {
     }
 
     try {
-        const response = await fetch(baseUrl + url, options); // Use absolute path
+        const response = await fetch(baseUrl + url, options); 
 
-        // Handle non-JSON responses (like 204 No Content)
         if (response.status === 204) {
             return null;
         }
-        
-        // Handle successful delete (200 OK with JSON message)
+
         const data = await response.json();
 
         if (!response.ok) {
-            // Throw an error with the message from the server's JSON response
+
             throw new Error(data.error || data.message || 'Something went wrong');
         }
 
         return data;
     } catch (error) {
         console.error('API Error:', error.message);
-        // Show the error to the user
+
         showToast(`Error: ${error.message}`, 'error');
-        // Re-throw the error so the calling function knows it failed
+    
         throw error;
     }
 }
 
-// --- INITIALIZATION ---
-
-/**
- * Runs when the DOM is fully loaded.
- * Sets up all initial event listeners and checks the user's session.
- */
 document.addEventListener('DOMContentLoaded', () => {
     console.log('QuizVerse App Initializing...');
 
-    // Auth page navigation
     document.getElementById('nav-to-register').addEventListener('click', (e) => { e.preventDefault(); navigateTo('page-register'); });
     document.getElementById('nav-to-login').addEventListener('click', (e) => { e.preventDefault(); navigateTo('page-login'); });
 
-    // Auth form submissions
     document.getElementById('login-form').addEventListener('submit', handleLogin);
     document.getElementById('register-form').addEventListener('submit', handleRegister);
     document.getElementById('logout-button').addEventListener('click', handleSignOut);
     
-    // Teacher navigation
     document.getElementById('nav-to-create-quiz').addEventListener('click', () => navigateTo('page-teacher-create-quiz'));
     document.getElementById('nav-back-to-teacher-dash').addEventListener('click', () => navigateTo('page-teacher-dashboard'));
     document.getElementById('nav-back-to-teacher-dash-2').addEventListener('click', () => navigateTo('page-teacher-dashboard'));
     
-    // Teacher forms
+    
     document.getElementById('create-quiz-form').addEventListener('submit', handleCreateQuiz);
     document.getElementById('add-question-form').addEventListener('submit', handleAddQuestionManual);
     document.getElementById('upload-csv-button').addEventListener('click', handleUploadCSV);
     document.getElementById('delete-quiz-button')?.addEventListener('click', handleDeleteQuiz);
 
-    // Teacher tabs
+
     document.querySelectorAll('.tab-link').forEach(tab => {
         tab.addEventListener('click', handleTabClick);
     });
     
-    // Student navigation
+   
     document.getElementById('nav-back-to-student-dash').addEventListener('click', () => navigateTo('page-student-dashboard'));
     
-    // Quiz taking
+ 
     document.getElementById('next-question-button').addEventListener('click', handleNextQuestion);
     document.getElementById('finish-quiz-button').addEventListener('click', handleFinishQuiz);
 
-    // Check if the user is already logged in
+  
     checkUserSession();
 });
 
-/**
- * Checks the backend for an active user session.
- */
 async function checkUserSession() {
     try {
         const data = await api('/api/session');
@@ -122,15 +87,11 @@ async function checkUserSession() {
         console.log('No active session. User must log in.');
         navigateTo('page-login');
     }
-    // Hide loader once auth is resolved
+ 
     document.getElementById('loader').classList.remove('active');
 }
 
-// --- AUTHENTICATION ---
 
-/**
- * Handles user registration form submission.
- */
 async function handleRegister(e) {
     e.preventDefault();
     const email = e.target.email.value;
@@ -145,13 +106,10 @@ async function handleRegister(e) {
         navigateTo(currentUser.role === 'teacher' ? 'page-teacher-dashboard' : 'page-student-dashboard');
         showToast('Account created successfully!', 'success');
     } catch (error) {
-        // Error is already logged by api()
+        
     }
 }
 
-/**
- * Handles user login form submission.
- */
 async function handleLogin(e) {
     e.preventDefault();
     const email = e.target.email.value;
@@ -165,13 +123,10 @@ async function handleLogin(e) {
         navigateTo(currentUser.role === 'teacher' ? 'page-teacher-dashboard' : 'page-student-dashboard');
         showToast('Logged in successfully!', 'success');
     } catch (error) {
-        // Error is already logged by api()
+     
     }
 }
 
-/**
- * Handles user sign-out.
- */
 async function handleSignOut() {
     try {
         await api('/api/logout', 'POST');
@@ -180,38 +135,31 @@ async function handleSignOut() {
         navigateTo('page-login');
         showToast('Logged out successfully.', 'success');
     } catch (error) {
-        // Error is already logged by api()
+
     }
 }
 
-// --- NAVIGATION & UI ---
 
-/**
- * Simple page router. Hides all pages, shows the one with the targetId.
- */
 function navigateTo(pageId) {
-    // Hide all pages
+    
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
     
-    // Show the target page
     const targetPage = document.getElementById(pageId);
     if (targetPage) {
         targetPage.classList.add('active');
     } else {
         console.error(`Page not found: ${pageId}`);
-        document.getElementById('page-login').classList.add('active'); // Fallback
+        document.getElementById('page-login').classList.add('active'); 
     }
 
-    // Update header nav based on role (if user is logged in)
     if (currentUser) {
         updateHeaderNav(pageId);
-        // Trigger data loading for the new page
+        
         loadPageData(pageId);
     }
     
-    // Special case for full-screen quiz page
     if (pageId === 'page-quiz-take') {
         document.getElementById('app-main').style.display = 'none';
     } else if (currentUser) {
@@ -219,9 +167,6 @@ function navigateTo(pageId) {
     }
 }
 
-/**
- * Fetches and displays the necessary data for the currently active page.
- */
 function loadPageData(pageId) {
     switch(pageId) {
         case 'page-teacher-dashboard':
@@ -232,10 +177,6 @@ function loadPageData(pageId) {
             break;
     }
 }
-
-/**
- * Updates the header navigation links based on role and active page.
- */
 function updateHeaderNav(pageId) {
     const navContainer = document.getElementById('nav-links');
     let links = '';
@@ -256,7 +197,6 @@ function updateHeaderNav(pageId) {
     }
     navContainer.innerHTML = links;
     
-    // Add click listeners to new nav links
     navContainer.querySelectorAll('a').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -265,15 +205,12 @@ function updateHeaderNav(pageId) {
     });
 }
 
-/**
- * Handles clicks on the tabs in the "Manage Quiz" page.
- */
 function handleTabClick(e) {
     e.preventDefault();
     const clickedTab = e.target;
     const tabName = clickedTab.dataset.tab;
 
-    // Update tab styles
+ 
     document.querySelectorAll('.tab-link').forEach(tab => {
         tab.classList.remove('tab-active');
         tab.classList.add('tab-inactive');
@@ -281,42 +218,31 @@ function handleTabClick(e) {
     clickedTab.classList.add('tab-active');
     clickedTab.classList.remove('tab-inactive');
 
-    // Show/hide tab content
+  
     document.querySelectorAll('.tab-content').forEach(content => {
         content.style.display = 'none';
     });
     document.getElementById(`tab-${tabName}`).style.display = 'block';
 }
 
-/**
- * Shows a toast notification.
- * @param {string} message - The message to display.
- * @param {'success' | 'error'} type - The type of toast.
- */
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.className = type === 'success' ? 'toast-success' : 'toast-error';
     
-    // Show toast
+
     toast.classList.add('show');
-    
-    // Hide after 3 seconds
+
     setTimeout(() => {
         toast.classList.remove('show');
     }, 3000);
 }
 
-// --- TEACHER: QUIZ MANAGEMENT ---
-
-/**
- * Loads and displays the list of quizzes for the teacher.
- */
 async function loadTeacherQuizzes() {
     try {
         const quizzes = await api('/api/quizzes');
         const listContainer = document.getElementById('teacher-quiz-list');
-        listContainer.innerHTML = ''; // Clear list
+        listContainer.innerHTML = ''; 
 
         if (quizzes.length === 0) {
             listContainer.innerHTML = `<p class="empty-state">You haven't created any quizzes yet. Click "Create New Quiz" to start.</p>`;
@@ -339,28 +265,24 @@ async function loadTeacherQuizzes() {
                     <button class="button-secondary" data-quiz-id="${quiz.id}">Manage</button>
                 </div>
             `;
-            // Add click listener for the manage button
+            
             card.querySelector('button').addEventListener('click', () => {
                 loadQuizManagePage(quiz.id);
             });
             listContainer.appendChild(card);
         });
-        lucide.createIcons(); // Re-render icons
+        lucide.createIcons(); 
     } catch (error) {
         console.error('Failed to load quizzes:', error);
     }
 }
 
-/**
- * Handles the "Create Quiz" form submission.
- */
 async function handleCreateQuiz(e) {
     e.preventDefault();
     const title = document.getElementById('quiz-title').value;
     const startTimeLocal = document.getElementById('quiz-start-time').value;
     const durationMinutes = document.getElementById('quiz-duration').value;
 
-    // Convert local datetime-local string to UTC ISO string
     const startTimeUTC = new Date(startTimeLocal).toISOString();
 
     try {
@@ -370,44 +292,39 @@ async function handleCreateQuiz(e) {
             durationMinutes
         });
         showToast('Quiz created successfully!', 'success');
-        navigateTo('page-teacher-dashboard'); // Go back to the dashboard to see the new quiz
-        e.target.reset(); // Clear the form
+        navigateTo('page-teacher-dashboard'); 
+        e.target.reset(); 
     } catch (error) {
-        // Error is already logged
+       
     }
 }
 
-/**
- * Loads all data for the "Manage Quiz" page (questions, results, logs).
- * @param {string} quizId - The ID of the quiz to manage.
- */
 async function loadQuizManagePage(quizId) {
     try {
         const data = await api(`/api/quizzes/${quizId}`);
         
-        // Store quiz ID in the form
+        
         document.getElementById('manage-quiz-id').value = quizId;
         
-        // Set title
+        
         document.getElementById('manage-quiz-title').textContent = `Manage: ${data.title}`;
 
-        // Populate questions list
+        
         renderQuestionList(data.questions);
 
-        // Populate results list
+        
         renderResultsList(data.results);
         
-        // Populate proctor logs list
+        
         renderProctorLogs(data.proctorLogs);
         
-        // Navigate to the page
+        
         navigateTo('page-teacher-manage-quiz');
         
-        // Reset to the first tab
+        
         document.querySelectorAll('.tab-link')[0].click();
 
-        // --- THIS IS THE FIX ---
-        // Re-render icons for the new page (e.g., delete button)
+
         lucide.createIcons(); 
 
     } catch (error) {
@@ -415,10 +332,6 @@ async function loadQuizManagePage(quizId) {
     }
 }
 
-/**
- * Renders the list of questions on the "Manage Quiz" page.
- * @param {Array} questions - The list of question objects.
- */
 function renderQuestionList(questions) {
     const list = document.getElementById('question-list-container');
     list.innerHTML = '';
@@ -438,10 +351,6 @@ function renderQuestionList(questions) {
     });
 }
 
-/**
- * Renders the list of student results on the "Manage Quiz" page.
- * @param {Array} results - The list of student attempt objects.
- */
 function renderResultsList(results) {
     const list = document.getElementById('results-list');
     list.innerHTML = '';
@@ -476,10 +385,6 @@ function renderResultsList(results) {
     list.appendChild(table);
 }
 
-/**
- * Renders the list of proctoring logs on the "Manage Quiz" page.
- * @param {Array} logs - The list of proctor log objects.
- */
 function renderProctorLogs(logs) {
     const list = document.getElementById('proctor-log-list');
     list.innerHTML = '';
@@ -516,9 +421,6 @@ function renderProctorLogs(logs) {
     list.appendChild(table);
 }
 
-/**
- * Handles the "Add Question Manually" form submission.
- */
 async function handleAddQuestionManual(e) {
     e.preventDefault();
     const quizId = document.getElementById('manage-quiz-id').value;
@@ -536,17 +438,13 @@ async function handleAddQuestionManual(e) {
     try {
         await api(`/api/quizzes/${quizId}/questions/manual`, 'POST', questionData);
         showToast('Question added!', 'success');
-        e.target.reset(); // Clear the form
-        // Reload the quiz data to show the new question
+        e.target.reset(); 
         loadQuizManagePage(quizId);
     } catch (error) {
-        // Error already logged
+        
     }
 }
 
-/**
- * Handles the "Upload CSV" button click.
- */
 async function handleUploadCSV() {
     const quizId = document.getElementById('manage-quiz-id').value;
     const fileInput = document.getElementById('csv-file-input');
@@ -563,7 +461,7 @@ async function handleUploadCSV() {
 
     statusEl.textContent = 'Uploading...';
     try {
-        // Use a special API call for FormData, not JSON
+        
         const response = await fetch(`${baseUrl}/api/quizzes/${quizId}/questions/csv`, {
             method: 'POST',
             body: formData,
@@ -577,8 +475,7 @@ async function handleUploadCSV() {
 
         showToast(data.message, 'success');
         statusEl.textContent = data.message;
-        fileInput.value = ''; // Clear file input
-        // Reload the quiz data to show new questions
+        fileInput.value = ''; 
         loadQuizManagePage(quizId);
 
     } catch (error) {
@@ -588,10 +485,6 @@ async function handleUploadCSV() {
     }
 }
 
-
-/**
- * Handles the "Delete Quiz" button click on the manage page.
- */
 async function handleDeleteQuiz() {
     const quizId = document.getElementById('manage-quiz-id').value;
     
@@ -599,33 +492,26 @@ async function handleDeleteQuiz() {
         showToast('Could not find quiz ID.', 'error');
         return;
     }
-    
-    // Show a confirmation dialog
+
     if (!confirm('Are you absolutely sure you want to delete this quiz? This will also delete all associated questions, attempts, and logs. This action cannot be undone.')) {
-        return; // User clicked "Cancel"
+        return; 
     }
 
     try {
-        // Call the DELETE endpoint
+        
         await api(`/api/quizzes/${quizId}`, 'DELETE');
         
         showToast('Quiz deleted successfully.', 'success');
         
-        // Navigate back to the main dashboard
+        
         navigateTo('page-teacher-dashboard');
 
     } catch (error) {
-        // The api() function will automatically show the error toast
+       
         console.error('Failed to delete quiz:', error);
     }
 }
 
-
-// --- STUDENT: QUIZ TAKING ---
-
-/**
- * Loads and displays the list of quizzes for the student.
- */
 async function loadStudentQuizzes() {
     try {
         const quizzes = await api('/api/student/quizzes');
@@ -648,18 +534,18 @@ async function loadStudentQuizzes() {
             let statusHtml = '';
 
             if (quiz.attempt && quiz.attempt.finished) {
-                // Quiz is finished
+              
                 const score = quiz.attempt.score;
                 const total = quiz.attempt.totalQuestions;
                 const percent = total > 0 ? Math.round((score / total) * 100) : 0;
                 statusHtml = `<div class="quiz-completed">Completed! Score: ${score}/${total} (${percent}%)</div>`;
                 buttonHtml = `<button class="button-disabled" disabled>Completed</button>`;
             } else if (canStart) {
-                // Quiz can be started
+                
                 statusHtml = `<div class="quiz-ready">Ready to start!</div>`;
                 buttonHtml = `<button class="button-primary" data-quiz-id="${quiz.id}">Start Quiz</button>`;
             } else {
-                // Quiz is not yet available
+                
                 statusHtml = `<div class_locked">Locked until: ${startTime.toLocaleString()}</div>`;
                 buttonHtml = `<button class="button-disabled" disabled>Locked</button>`;
             }
@@ -678,7 +564,6 @@ async function loadStudentQuizzes() {
                 </div>
             `;
 
-            // Add click listener for the START button (if it's not disabled)
             const startButton = card.querySelector('.button-primary');
             if (startButton) {
                 startButton.addEventListener('click', () => {
@@ -689,44 +574,39 @@ async function loadStudentQuizzes() {
             }
             listContainer.appendChild(card);
         });
-        lucide.createIcons(); // Re-render icons
+        lucide.createIcons(); 
     } catch (error) {
         console.error('Failed to load student quizzes:', error);
     }
 }
 
-/**
- * Starts a quiz attempt for the student.
- * @param {string} quizId - The ID of the quiz to start.
- */
 async function startQuiz(quizId) {
     try {
         const data = await api(`/api/student/quiz/${quizId}/start`, 'POST');
-        
-        // Initialize the global quiz state
+
         currentQuizState = {
             quizId: quizId,
             attemptId: data.attemptId,
             questions: data.questions,
-            answers: {}, // { questionId: "A" }
+            answers: {}, 
             currentQuestionIndex: 0,
             quizEndTime: Date.now() + (data.duration * 60 * 1000)
         };
 
-        // Set up the quiz page
+        
         document.getElementById('quiz-take-title').textContent = data.quizTitle;
         document.getElementById('question-total-num').textContent = data.questions.length;
         
-        // Show the quiz page
+      
         navigateTo('page-quiz-take');
 
-        // Start the master timer
+        
         startMasterTimer();
         
-        // Load the first question
+        
         renderCurrentQuestion();
 
-        // ** START PROCTORING **
+       
         addProctoringListeners();
 
     } catch (error) {
@@ -734,10 +614,6 @@ async function startQuiz(quizId) {
     }
 }
 
-/**
- * --- THIS IS THE MODIFIED FUNCTION ---
- * Renders the question at the current index.
- */
 function renderCurrentQuestion() {
     if (!currentQuizState) return;
     const state = currentQuizState;
@@ -755,7 +631,6 @@ function renderCurrentQuestion() {
         optionEl.className = 'quiz-option-button';
         optionEl.dataset.option = key;
         
-        // --- THIS HTML IS MODIFIED ---
         optionEl.innerHTML = `
             <span class="option-key">${key}</span>
             <span class="option-text">${optionText}</span>
@@ -764,67 +639,56 @@ function renderCurrentQuestion() {
                 Selected
             </span>
         `;
-        // --- END OF MODIFICATION ---
 
-        // Check if this option was previously selected
         if (state.answers[q.id] === key) {
             optionEl.classList.add('selected');
         }
 
-        // Add click listener to select this option
         optionEl.addEventListener('click', () => {
-            // Unselect other options
+ 
             optionsContainer.querySelectorAll('.quiz-option-button').forEach(btn => {
                 btn.classList.remove('selected');
             });
-            // Select this one
+
             optionEl.classList.add('selected');
-            // Save the answer
+
             state.answers[q.id] = key;
         });
         
         optionsContainer.appendChild(optionEl);
     });
-    
-    // Manage button visibility
+
     const nextButton = document.getElementById('next-question-button');
     const finishButton = document.getElementById('finish-quiz-button');
     
     if (state.currentQuestionIndex === state.questions.length - 1) {
-        // Last question
+
         nextButton.style.display = 'none';
         finishButton.style.display = 'block';
     } else {
-        // Not the last question
+
         nextButton.style.display = 'block';
         finishButton.style.display = 'none';
     }
 
-    // --- THIS LINE IS ADDED ---
-    // This tells the icon library to render the new "check-circle" icon
+
     lucide.createIcons();
 }
 
-
-/**
- * Handles the "Next Question" button click.
- */
 function handleNextQuestion() {
     if (!currentQuizState) return;
     currentQuizState.currentQuestionIndex++;
     renderCurrentQuestion();
 }
 
-/**
- * Handles the final "Finish Quiz" button click.
- */
+
 async function handleFinishQuiz() {
     if (!currentQuizState) return;
     if (!confirm('Are you sure you want to submit your quiz?')) {
         return;
     }
     
-    // Stop timer and proctoring
+ 
     stopMasterTimer();
     removeProctoringListeners();
 
@@ -835,23 +699,19 @@ async function handleFinishQuiz() {
             answers: state.answers
         });
 
-        // Show result page
+        
         showResultPage(result.score, result.totalQuestions);
         
     } catch (error) {
         showToast(`Failed to submit quiz: ${error.message}`, 'error');
-        // Still navigate back to dashboard
+     
         navigateTo('page-student-dashboard');
     } finally {
-        currentQuizState = null; // Clear the state
+        currentQuizState = null; 
     }
 }
 
-/**
- * Displays the final score page.
- * @param {number} score - Number of correct answers.
- * @param {number} total - Total number of questions.
- */
+
 function showResultPage(score, total) {
     const percent = total > 0 ? Math.round((score / total) * 100) : 0;
     document.getElementById('final-score').textContent = `${score} / ${total}`;
@@ -859,14 +719,11 @@ function showResultPage(score, total) {
     navigateTo('page-student-result');
 }
 
-/**
- * Starts the master countdown timer for the quiz.
- */
 function startMasterTimer() {
     const timerEl = document.getElementById('quiz-timer');
     
     const updateTimer = () => {
-        if (!currentQuizState) { // Handle case where state is cleared
+        if (!currentQuizState) { 
              stopMasterTimer();
              return;
         }
@@ -874,11 +731,11 @@ function startMasterTimer() {
         const remainingMs = currentQuizState.quizEndTime - now;
         
         if (remainingMs <= 0) {
-            // Time's up!
+            
             stopMasterTimer();
             timerEl.textContent = '00:00';
             showToast("Time's up! Automatically submitting your quiz.", 'error');
-            handleFinishQuiz(); // Auto-submit
+            handleFinishQuiz(); 
             return;
         }
         
@@ -889,18 +746,15 @@ function startMasterTimer() {
         timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
     
-    // Clear any existing timer
+
     if (masterTimerInterval) {
         clearInterval(masterTimerInterval);
     }
     
-    updateTimer(); // Run once immediately
+    updateTimer(); 
     masterTimerInterval = setInterval(updateTimer, 1000);
 }
 
-/**
- * Stops the master countdown timer.
- */
 function stopMasterTimer() {
     if (masterTimerInterval) {
         clearInterval(masterTimerInterval);
@@ -908,13 +762,8 @@ function stopMasterTimer() {
     }
 }
 
-// --- PROCTORING ---
-
-/**
- * The event handler for `window.onblur`. Logs the event to the server.
- */
 function handleProctoringEvent() {
-    if (!currentQuizState) return; // Not in a quiz
+    if (!currentQuizState) return; 
     
     console.log('FOCUS LOST! Logging event...');
     
@@ -923,23 +772,18 @@ function handleProctoringEvent() {
         eventType: 'focus_lost',
         questionNumber: state.currentQuestionIndex + 1
     }).catch(err => {
-        // Log error but don't bother the user
+
         console.error('Failed to log proctoring event:', err);
     });
 }
 
-/**
- * Adds the `onblur` event listener to the window.
- */
 function addProctoringListeners() {
     console.log('Proctoring enabled.');
     window.addEventListener('blur', handleProctoringEvent);
 }
 
-/**
- * Removes the `onblur` event listener from the window.
- */
 function removeProctoringListeners() {
     console.log('Proctoring disabled.');
     window.removeEventListener('blur', handleProctoringEvent);
+
 }
