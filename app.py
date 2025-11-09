@@ -7,10 +7,9 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timezone
 
-# --- App Setup ---
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.config['SECRET_KEY'] = 'your_super_secret_key_change_this'
-# Use SQLite for simplicity. Creates a file 'quizverse.db' in the project directory.
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quizverse.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -18,14 +17,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-
-# --- Database Models ---
-
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(150), nullable=False)
-    role = db.Column(db.String(50), nullable=False) # 'student' or 'teacher'
+    role = db.Column(db.String(50), nullable=False)
 
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
@@ -55,7 +51,7 @@ class Question(db.Model):
     option_b = db.Column(db.String(200), nullable=False)
     option_c = db.Column(db.String(200), nullable=False)
     option_d = db.Column(db.String(200), nullable=False)
-    correct_answer = db.Column(db.String(1), nullable=False) # 'A', 'B', 'C', or 'D'
+    correct_answer = db.Column(db.String(1), nullable=False) 
 
 class Attempt(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,14 +75,11 @@ class ProctorLog(db.Model):
     
     student = db.relationship('User', backref='proctor_logs')
 
-# --- User Loader for Flask-Login ---
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 # --- API Routes ---
-
-# --- Authentication ---
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -129,8 +122,6 @@ def check_session():
     if current_user.is_authenticated:
         return jsonify({'uid': current_user.id, 'email': current_user.email, 'role': current_user.role}), 200
     return jsonify({'error': 'Not authenticated'}), 401
-
-# --- Teacher API ---
 @app.route('/api/quizzes', methods=['GET', 'POST'])
 @login_required
 def manage_quizzes():
@@ -138,7 +129,7 @@ def manage_quizzes():
         return jsonify({'error': 'Not authorized'}), 403
 
     if request.method == 'POST':
-        # Create new quiz
+       
         data = request.get_json()
         try:
             start_time = datetime.fromisoformat(data['startTime'].replace('Z', '+00:00'))
@@ -157,7 +148,7 @@ def manage_quizzes():
             return jsonify({'error': f'Error creating quiz: {str(e)}'}), 400
 
     if request.method == 'GET':
-        # Get all quizzes for this teacher
+        
         quizzes = Quiz.query.filter_by(teacher_id=current_user.id).all()
         quiz_list = [{
             'id': q.id,
@@ -176,7 +167,6 @@ def manage_quiz_details(quiz_id):
     if not quiz:
         return jsonify({'error': 'Quiz not found'}), 404
 
-    # --- DELETE Request Logic ---
     if request.method == 'DELETE':
         if current_user.role != 'teacher':
             return jsonify({'error': 'Not authorized'}), 403
@@ -192,7 +182,6 @@ def manage_quiz_details(quiz_id):
             db.session.rollback()
             return jsonify({'error': f'Error deleting quiz: {str(e)}'}), 500
 
-    # --- GET Request Logic (Original function) ---
     if request.method == 'GET':
         if current_user.role == 'teacher' and quiz.teacher_id != current_user.id:
             return jsonify({'error': 'Not authorized to view this quiz'}), 403
@@ -319,7 +308,6 @@ def add_questions_csv(quiz_id):
     
     return jsonify({'error': 'Invalid file type. Must be .csv'}), 400
 
-# --- Student API ---
 @app.route('/api/student/quizzes', methods=['GET'])
 @login_required
 def get_student_quizzes():
@@ -349,7 +337,6 @@ def get_student_quizzes():
         
     return jsonify(quiz_list), 200
 
-# --- THIS IS THE MODIFIED FUNCTION ---
 @app.route('/api/student/quiz/<int:quiz_id>/start', methods=['POST'])
 @login_required
 def start_quiz_attempt(quiz_id):
@@ -364,8 +351,6 @@ def start_quiz_attempt(quiz_id):
     if attempt:
         return jsonify({'error': 'Quiz already attempted'}), 400
         
-    # --- THIS LINE IS THE FIX ---
-    # We use .utcnow() which is naive, to match the naive datetime from the database
     if datetime.utcnow() < quiz.start_time:
         return jsonify({'error': 'Quiz has not started yet'}), 403
         
@@ -406,7 +391,7 @@ def submit_quiz_attempt(quiz_id):
         return jsonify({'error': 'No active attempt found'}), 404
         
     data = request.get_json()
-    student_answers = data.get('answers', {}) # { 'question_id': 'A' }
+    student_answers = data.get('answers', {}) 
     
     try:
         questions = Question.query.filter_by(quiz_id=quiz_id).all()
@@ -432,7 +417,6 @@ def submit_quiz_attempt(quiz_id):
         db.session.rollback()
         return jsonify({'error': f'Error submitting quiz: {str(e)}'}), 400
 
-# --- Proctoring API ---
 @app.route('/api/student/quiz/<int:quiz_id>/log', methods=['POST'])
 @login_required
 def log_proctor_event(quiz_id):
@@ -454,7 +438,6 @@ def log_proctor_event(quiz_id):
         db.session.rollback()
         return jsonify({'error': f'Error logging event: {str(e)}'}), 400
 
-# --- Serve Static Files (HTML/CSS/JS) ---
 @app.route('/')
 def serve_index():
     return send_from_directory('static', 'index.html')
@@ -463,8 +446,8 @@ def serve_index():
 def serve_static(path):
     return send_from_directory('static', path)
 
-# --- Run the App ---
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+
     app.run(debug=True, port=5000)
